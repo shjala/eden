@@ -1,5 +1,5 @@
 # Number of tests
-{{$tests := 23}}
+{{$tests := 24}}
 # EDEN_TEST_SETUP env. var. -- "y"(default) performs the EDEN setup steps
 {{$setup := "y"}}
 {{$setup_env := EdenGetEnv "EDEN_TEST_SETUP"}}
@@ -81,3 +81,6 @@ eden.escript.test -test.run TestEdenScripts/eden_reset
 
 /bin/echo EVE security tests (23/{{$tests}})
 eden.escript.test -test.run TestEdenScripts/sec_eden
+
+/bin/echo EVE VCOM tests (24/{{$tests}})
+eden.escript.test -test.run TestEdenScripts/vcom_eden
