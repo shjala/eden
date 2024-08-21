@@ -19,16 +19,18 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// RemoteNode is a struct that holds the information about the remote node
 type RemoteNode struct {
-	Controler *openevec.OpenEVEC
-	Edgenode  *device.Ctx
-	Tc        *projects.TestContext
-	Ip        string
-	SshPort   string
-	SshUser   string
-	SshPass   string
+	Controller *openevec.OpenEVEC
+	Edgenode   *device.Ctx
+	Tc         *projects.TestContext
+	IP         string
+	SSHPort    string
+	SSHUser    string
+	SSHPass    string
 }
 
+// GetOpenEVEC returns the OpenEVEC controller
 func GetOpenEVEC() *openevec.OpenEVEC {
 	edenConfigEnv := os.Getenv(defaults.DefaultConfigEnv)
 	configName := utils.GetConfig(edenConfigEnv)
@@ -41,15 +43,17 @@ func GetOpenEVEC() *openevec.OpenEVEC {
 	return openevec.CreateOpenEVEC(viperCfg)
 }
 
+// CreateRemoteNode creates a new RemoteNode struct
 func CreateRemoteNode(node *device.Ctx, tc *projects.TestContext) *RemoteNode {
 	evec := GetOpenEVEC()
 	if evec == nil {
 		return nil
 	}
 
-	return &RemoteNode{Controler: evec, Edgenode: node, Tc: tc, Ip: "", SshPort: "22"}
+	return &RemoteNode{Controller: evec, Edgenode: node, Tc: tc, IP: "", SSHPort: "22"}
 }
 
+// RunEveCommand runs a command on the EVE node
 func (node *RemoteNode) RunEveCommand(command string) ([]byte, error) {
 	realStdout := os.Stdout
 	r, w, err := os.Pipe()
@@ -60,7 +64,7 @@ func (node *RemoteNode) RunEveCommand(command string) ([]byte, error) {
 	os.Stdout = w
 
 	// unfortunately, we can't capture command return value from SSHEve
-	err = node.Controler.SSHEve(command)
+	err = node.Controller.SSHEve(command)
 
 	os.Stdout = realStdout
 	w.Close()
@@ -73,6 +77,7 @@ func (node *RemoteNode) RunEveCommand(command string) ([]byte, error) {
 	return out, nil
 }
 
+// FileExists checks if a file exists on EVE node
 func (node *RemoteNode) FileExists(fileName string) (bool, error) {
 	command := fmt.Sprintf("if stat \"%s\"; then echo \"1\"; else echo \"0\"; fi", fileName)
 	out, err := node.RunEveCommand(command)
@@ -87,6 +92,7 @@ func (node *RemoteNode) FileExists(fileName string) (bool, error) {
 	return true, nil
 }
 
+// ReadFile reads a file from EVE node
 func (node *RemoteNode) ReadFile(fileName string) ([]byte, error) {
 	exist, err := node.FileExists(fileName)
 	if err != nil {
@@ -101,6 +107,7 @@ func (node *RemoteNode) ReadFile(fileName string) ([]byte, error) {
 	return node.RunEveCommand(command)
 }
 
+// DeleteFile deletes a file from EVE node
 func (node *RemoteNode) DeleteFile(fileName string) error {
 	exist, err := node.FileExists(fileName)
 	if err != nil {
@@ -116,6 +123,7 @@ func (node *RemoteNode) DeleteFile(fileName string) error {
 	return err
 }
 
+// WaitForAppStart waits for an app to start on the EVE node
 func (node *RemoteNode) WaitForAppStart(appName string, timeoutSeconds uint) error {
 	start := time.Now()
 	for {
@@ -136,10 +144,12 @@ func (node *RemoteNode) WaitForAppStart(appName string, timeoutSeconds uint) err
 	}
 }
 
-func (node *RemoteNode) WaitForSsh(timeoutSeconds uint) error {
+// WaitForSSH waits for the SSH connection to be established to the app VM that
+// is running on the EVE node
+func (node *RemoteNode) WaitForSSH(timeoutSeconds uint) error {
 	start := time.Now()
 	for {
-		_, err := node.AppSshExec("echo")
+		_, err := node.AppSSHExec("echo")
 		if err == nil {
 			return nil
 		}
@@ -152,18 +162,20 @@ func (node *RemoteNode) WaitForSsh(timeoutSeconds uint) error {
 	}
 }
 
+// StopAndRemoveApp stops and removes an app from the EVE node
 func (node *RemoteNode) StopAndRemoveApp(appName string) error {
-	if err := node.Controler.PodStop(appName); err != nil {
+	if err := node.Controller.PodStop(appName); err != nil {
 		return err
 	}
 
-	if _, err := node.Controler.PodDelete(appName, true); err != nil {
+	if _, err := node.Controller.PodDelete(appName, true); err != nil {
 		return err
 	}
 
 	return nil
 }
 
+// GetNodeIP gets the IP address of the app running the EVE node
 func (node *RemoteNode) GetNodeIP() error {
 	if node.Edgenode.GetRemoteAddr() == "" {
 		eveIPCIDR, err := node.Tc.GetState(node.Edgenode).LookUp("Dinfo.Network[0].IPAddrs[0]")
@@ -176,14 +188,15 @@ func (node *RemoteNode) GetNodeIP() error {
 			return fmt.Errorf("failed to parse IP address: %s", eveIPCIDR.String())
 		}
 
-		node.Ip = ip.To4().String()
+		node.IP = ip.To4().String()
 		return nil
 	}
 
-	node.Ip = node.Edgenode.GetRemoteAddr()
+	node.IP = node.Edgenode.GetRemoteAddr()
 	return nil
 }
 
+// GetAppState gets the state of an app running on the EVE node
 func (node *RemoteNode) GetAppState(appName string) (string, error) {
 	ctrl, err := controller.CloudPrepare()
 	if err != nil {
@@ -208,13 +221,14 @@ func (node *RemoteNode) GetAppState(appName string) (string, error) {
 	return "", fmt.Errorf("app %s not found", appName)
 }
 
-func (node *RemoteNode) AppSshExec(command string) (string, error) {
-	host := fmt.Sprintf("%s:%s", node.Ip, node.SshPort) // Include port if necessary (default is 22)
+// AppSSHExec executes a command on the app VM running on the EVE node
+func (node *RemoteNode) AppSSHExec(command string) (string, error) {
+	host := fmt.Sprintf("%s:%s", node.IP, node.SSHPort)
 
 	config := &ssh.ClientConfig{
-		User: node.SshUser,
+		User: node.SSHUser,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(node.SshPass),
+			ssh.Password(node.SSHPass),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         30 * time.Second,
@@ -225,7 +239,6 @@ func (node *RemoteNode) AppSshExec(command string) (string, error) {
 	}
 	defer client.Close()
 
-	// Create a session
 	session, err := client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %s", err)
@@ -240,13 +253,14 @@ func (node *RemoteNode) AppSshExec(command string) (string, error) {
 	return string(output), nil
 }
 
-func (node *RemoteNode) AppScpCopy(localFile, remoteFile string) error {
-	host := fmt.Sprintf("%s:%s", node.Ip, node.SshPort)
+// AppSCPCopy copies a file from the local machine to the app VM running on the EVE node
+func (node *RemoteNode) AppSCPCopy(localFile, remoteFile string) error {
+	host := fmt.Sprintf("%s:%s", node.IP, node.SSHPort)
 
 	config := &ssh.ClientConfig{
-		User: node.SshUser,
+		User: node.SSHUser,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(node.SshPass),
+			ssh.Password(node.SSHPass),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         30 * time.Second,
@@ -257,7 +271,6 @@ func (node *RemoteNode) AppScpCopy(localFile, remoteFile string) error {
 	}
 	defer client.Close()
 
-	// Create a session
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("failed to create session: %s", err)

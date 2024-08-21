@@ -64,29 +64,29 @@ func TestVcomLink(t *testing.T) {
 		t.Fatalf("Failed to wait for app to start: %v", err)
 	}
 
-	rnode.SshUser = vmUser
-	rnode.SshPass = vmPass
-	rnode.SshPort = sshPort
+	rnode.SSHUser = vmUser
+	rnode.SSHPass = vmPass
+	rnode.SSHPort = sshPort
 	err = rnode.GetNodeIP()
 	if err != nil {
 		t.Fatalf("Failed to get node IP: %v", err)
 	}
 
 	t.Logf("Waiting for ssh to be ready...")
-	err = rnode.WaitForSsh(60 * 5)
+	err = rnode.WaitForSSH(60 * 5)
 	if err != nil {
 		t.Fatalf("Failed to wait for ssh: %v", err)
 	}
 	t.Logf("SSH connection established")
 
-	_, err = rnode.AppSshExec("sudo apt-get -y install socat")
+	_, err = rnode.AppSSHExec("sudo apt-get -y install socat")
 	if err != nil {
-		t.Fatalf("Failed instal socat on the vm: %v", err)
+		t.Fatalf("Failed install socat on the vm: %v", err)
 	}
 
 	// send a request to vcomlink via vsock to get the host's TPM EK
 	command := "echo '{\"channel\":2,\"request\":1}' | socat - VSOCK-CONNECT:2:2000"
-	out, err := rnode.AppSshExec(command)
+	out, err := rnode.AppSSHExec(command)
 	if err != nil {
 		t.Fatalf("Failed to communicate with host via vsock: %v", err)
 	}

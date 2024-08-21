@@ -129,11 +129,7 @@ func deployApp(appLink, name, metadata string, portPub []string) error {
 	pc.StartDelay = 0
 	pc.PinCpus = false
 
-	if err := rnode.Controler.PodDeploy(appLink, pc, cfg); err != nil {
-		return err
-	}
-
-	return nil
+	return rnode.Controller.PodDeploy(appLink, pc, cfg)
 }
 
 func getAppName(prefix string) string {
