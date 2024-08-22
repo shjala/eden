@@ -152,7 +152,7 @@ func (node *EveNode) EveReadFile(fileName string) ([]byte, error) {
 }
 
 // DeleteFile deletes a file from EVE node
-func (node *EveNode) DeleteFile(fileName string) error {
+func (node *EveNode) EveDeleteFile(fileName string) error {
 	exist, err := node.EveFileExists(fileName)
 	if err != nil {
 		return err
@@ -252,6 +252,10 @@ func (node *EveNode) GetState(appName string) (string, error) {
 // SSHExec executes a command on the app VM running on the EVE node
 func (node *EveNode) SSHExec(appName, command string) (string, error) {
 	appConfig := node.getAppConfig(appName)
+	if appConfig == nil {
+		return "", fmt.Errorf("app %s not found", appName)
+	}
+
 	host := fmt.Sprintf("%s:%s", node.ip, appConfig.sshPort)
 
 	config := &ssh.ClientConfig{
@@ -285,6 +289,10 @@ func (node *EveNode) SSHExec(appName, command string) (string, error) {
 // SCPCopy copies a file from the local machine to the app VM running on the EVE node
 func (node *EveNode) SCPCopy(appName, localFile, remoteFile string) error {
 	appConfig := node.getAppConfig(appName)
+	if appConfig == nil {
+		return fmt.Errorf("app %s not found", appName)
+	}
+
 	host := fmt.Sprintf("%s:%s", node.ip, appConfig.sshPort)
 
 	config := &ssh.ClientConfig{
@@ -381,13 +389,14 @@ func GetDefaultVmConfig(name, cloudConfig string, portPub []string) openevec.Pod
 }
 
 // SetControllerVerbosity sets the verbosity level of the controller,
-// possible values are: panic, fatal, error, debug, info, trace
+// possible values are: panic, fatal, error, debug, info, trace, warn
+// this should be set before calling InitilizeTest.
 func SetControllerVerbosity(verbosity string) {
 	controllerVerbosiry = verbosity
 }
 
 // SetEdenConfigEnv sets the environment variable that holds the path to the
-// eden configuration file.
+// eden configuration file. This should be set before calling InitilizeTest.
 func SetEdenConfigEnv(env string) {
 	edenConfEnv = env
 }
